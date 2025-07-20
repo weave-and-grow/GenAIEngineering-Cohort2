@@ -1,0 +1,46 @@
+import math, pandas as pd
+
+# Assuming 'client' is defined elsewhere in your actual code
+# from openai import OpenAI
+# client = OpenAI() 
+
+completion = client.chat.completions.create(
+    model="mistralai/Mistral-7B-Instruct-v0.3",
+    messages=[
+        {
+            "role": "user",
+            "content": "What is the capital of France?"
+        }
+    ],
+    logprobs=True,
+    top_logprobs=5,  # This will give you the top 5 log probabilities as requested
+)
+print(completion.choices[0].message)
+print(completion.choices[0].logprobs)
+
+logprobs_data = completion.choices[0].logprobs # Renamed for clarity to avoid conflict with the type
+
+records = []
+# Iterate through the 'content' attribute of the logprobs_data object
+for idx, logprob_obj in enumerate(logprobs_data.content):
+    tok = logprob_obj.token
+    lp = logprob_obj.logprob
+    top = logprob_obj.top_logprobs
+
+    chosen = f"{tok} ({math.exp(lp):.3f})"
+    
+    # Sort top alternatives by log probability in descending order
+    alts = sorted([(t.token, t.logprob) for t in top], key=lambda kv: kv[1], reverse=True)
+    alts_fmt = [f"{t} ({math.exp(lp_):.3f})" for t, lp_ in alts]
+    alts_fmt += [''] * (5 - len(alts_fmt))  # pad to 5, as top_logprobs was set to 5
+
+    records.append([idx, chosen, *alts_fmt])
+
+df = pd.DataFrame(records,
+                  columns=["Idx", "Chosen (p)", "Alt-1", "Alt-2",
+                           "Alt-3", "Alt-4", "Alt-5"])
+
+print(df.to_string(index=False))
+
+print("\nFinal message:")
+print(completion.choices[0].message.content)
